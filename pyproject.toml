@@ -7,7 +7,7 @@ requires-python = ">=3.13"
 dependencies = [
     "flake8>=7.3.0",
     "mcp>=1.28.1",
-    "mypy>=1.19.1"
+    "mypy>=1.19.1",
     "pydantic>=2.13.4",
     "python-dotenv>=1.2.2",
     "requests>=2.34.2",
@@ -15,6 +15,3 @@ dependencies = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.uv]
-env = { PYTHONPATH = "src" }

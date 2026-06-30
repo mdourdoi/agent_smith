@@ -14,7 +14,7 @@ async def main():
             await session.initialize()
             
             result = await session.call_tool("run_tests", {
-                "code": "def sub_list(nums1, nums2):\n    return list(map(lambda x, y: x - y, nums1, nums2))",
+                "code": "def sub_list(nums1, nums2):\n    return [999, 999]",  # code faux
                 "tests": [
                     "assert sub_list([1,2],[3,4])==[-2,-2]",
                     "assert sub_list([90,120],[50,70])==[40,50]"
