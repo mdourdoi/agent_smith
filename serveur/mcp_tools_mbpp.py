@@ -6,9 +6,6 @@ import sys
 
 mcp = FastMCP("MBPP_SERV")
 
-# Cap the test run so a bad solution (infinite loop, etc.) cannot hang
-# the server. The MCP tool runs outside the sandbox, so we still isolate
-# execution in a throwaway subprocess.
 RUN_TESTS_TIMEOUT = 15
 
 
@@ -26,8 +23,6 @@ def run_tests(code: str, tests: List[str]) -> str:
     """
     script = code + "\n"
     for i, test in enumerate(tests):
-        # Wrap each assertion so we can report exactly which one failed
-        # without stopping at the first failure.
         script += (
             f"try:\n"
             f"    {test}\n"
@@ -35,7 +30,6 @@ def run_tests(code: str, tests: List[str]) -> str:
             f"except Exception as _e:\n"
             f"    print(f'FAIL {i}: {{type(_e).__name__}}: {{_e}}')\n"
         )
-
     try:
         proc = subprocess.run(
             [sys.executable, "-c", script],
@@ -48,11 +42,8 @@ def run_tests(code: str, tests: List[str]) -> str:
             f"Timeout: tests did not finish within {RUN_TESTS_TIMEOUT}s "
             "(possible infinite loop in the solution)."
         )
-
     if proc.returncode != 0 and not proc.stdout:
-        # The code itself failed to run (syntax error, etc.).
         return f"Error running solution:\n{proc.stderr.strip()}"
-
     failures = [
         line for line in proc.stdout.splitlines()
         if line.startswith("FAIL")
