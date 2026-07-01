@@ -3,6 +3,12 @@ import io
 import json
 import contextlib
 
+# Cap on how much stdout we send back per execution. Beyond this the
+# output is truncated with an explicit notice, so the LLM knows it did
+# not see everything (subject V.1: feedback on truncation) and so a huge
+# output cannot blow the input-token budget on the next step.
+MAX_OUTPUT_CHARS = 8000
+
 
 class SandboxServer:
     def __init__(self):
@@ -20,6 +26,17 @@ class SandboxServer:
 
         self.namespace["final_answer"] = final_answer
 
+    def _truncate(self, text: str) -> str:
+        if len(text) <= MAX_OUTPUT_CHARS:
+            return text
+        head = text[:MAX_OUTPUT_CHARS]
+        dropped = len(text) - MAX_OUTPUT_CHARS
+        return (
+            f"{head}\n"
+            f"... [output truncated: {dropped} more characters were "
+            f"dropped because it exceeded {MAX_OUTPUT_CHARS} characters]"
+        )
+
     def execute(self, code: str) -> dict:
         self._final_answer_holder.clear()
         buf = io.StringIO()
@@ -32,7 +49,7 @@ class SandboxServer:
             error = f"ERROR: {type(e).__name__}: {e}"
 
         return {
-            "output": buf.getvalue(),
+            "output": self._truncate(buf.getvalue()),
             "final_answer": self._final_answer_holder.get("value"),
             "error": error,
         }

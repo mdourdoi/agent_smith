@@ -1,7 +1,8 @@
 import time
-from abc import ABC
+from abc import ABC, abstractmethod
 
-from core.sandbox import Sandbox, FinalAnswerSignal
+from core.sandbox import Sandbox
+from core.final_answer_signal import FinalAnswerSignal
 from core.step_metrics import StepMetrics
 from core.solution_output import SolutionOutput
 from core.code_extractor import CodeExtractor, ExtractionResult
@@ -38,7 +39,9 @@ class BaseOrchestrator(ABC):
         ]
 
     @property
-    def benchmark(self) -> str: ...
+    @abstractmethod
+    def benchmark(self) -> str:
+        ...
 
     def _build_observation(
         self,
