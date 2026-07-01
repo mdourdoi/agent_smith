@@ -16,6 +16,12 @@ class Console:
     def _c(self, text: str, color: str) -> str:
         return f"{color}{text}{self.RESET}"
 
+    def mcp_connected(self, tools: list[str]) -> None:
+        if not self.verbose:
+            return
+        print(self._c("MCP server connected.", self.GREEN)
+              + self._c(f" Tools: {tools}", self.DIM))
+
     def task_start(self, task_id: str, benchmark: str, model: str) -> None:
         if not self.verbose:
             return
