@@ -5,6 +5,8 @@ Limits from subject VI.1.1.
 
 from core.orchestrator_base import BaseOrchestrator
 
+MBPP_DOCKER_IMAGE = "python:3.11-slim"
+
 
 class MBPPOrchestrator(BaseOrchestrator):
     max_iterations = 10

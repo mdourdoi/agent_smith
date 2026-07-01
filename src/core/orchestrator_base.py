@@ -1,10 +1,12 @@
-import re
 import time
-from abc import ABC
+from abc import ABC, abstractmethod
 
-from core.sandbox import Sandbox, FinalAnswerSignal
-from core.models import StepMetrics, SolutionOutput
+from core.sandbox import Sandbox
+from core.final_answer_signal import FinalAnswerSignal
+from core.step_metrics import StepMetrics
+from core.solution_output import SolutionOutput
 from core.code_extractor import CodeExtractor, ExtractionResult
+from core.console import Console
 
 
 class BaseOrchestrator(ABC):
@@ -22,6 +24,7 @@ class BaseOrchestrator(ABC):
         task_id: str,
         model_name: str,
         api_url: str,
+        verbose: bool = False,
     ):
         self.sandbox = sandbox
         self.call_llm = call_llm
@@ -30,22 +33,21 @@ class BaseOrchestrator(ABC):
         self.model_name = model_name
         self.api_url = api_url
         self.extractor = CodeExtractor()
+        self.console = Console(verbose=verbose)
         self.conversation_history = [
             {"role": "system", "content": system_prompt}
         ]
 
     @property
-    def benchmark(self) -> str: ...
+    @abstractmethod
+    def benchmark(self) -> str:
+        ...
 
     def _build_observation(
         self,
         extraction: ExtractionResult | None,
         sandbox_output: str,
     ) -> str:
-        """
-        Build the observation message fed back to the LLM.
-        Always explicit - the LLM must never guess what happened.
-        """
         parts = []
 
         if extraction is None:
@@ -61,8 +63,9 @@ class BaseOrchestrator(ABC):
 
         if extraction.original_format != "python":
             parts.append(
-                f"NOTE: Your response was in {extraction.original_format!r} format "
-                f"and was automatically converted to Python before execution."
+                "NOTE: Your response was in "
+                f"{extraction.original_format!r} format "
+                "and was automatically converted to Python before execution."
             )
 
         if not sandbox_output.strip():
@@ -73,11 +76,14 @@ class BaseOrchestrator(ABC):
         return "\n".join(parts)
 
     def run(self, task_description: str) -> SolutionOutput:
-        """
-        Run the agentic loop on a given task.
-        Always returns a SolutionOutput - success=False if any limit
-        is exceeded before final_answer() is called.
-        """
+        self.console.task_start(self.task_id, self.benchmark, self.model_name)
+        self.sandbox.start()
+        try:
+            return self._run_loop(task_description)
+        finally:
+            self.sandbox.cleanup()
+
+    def _run_loop(self, task_description: str) -> SolutionOutput:
         self.conversation_history.append(
             {"role": "user", "content": task_description}
         )
@@ -91,9 +97,12 @@ class BaseOrchestrator(ABC):
         success = False
 
         for iteration in range(self.max_iterations):
+            self.console.iteration(iteration + 1, self.max_iterations)
+
             elapsed = time.monotonic() - start_time
             if elapsed > self.timeout_seconds:
                 error = f"Timeout exceeded ({self.timeout_seconds}s)."
+                self.console.error(error)
                 break
 
             step_start = time.monotonic()
@@ -105,13 +114,17 @@ class BaseOrchestrator(ABC):
             total_input_tokens += input_tokens
             total_output_tokens += output_tokens
 
+            self.console.thought(llm_response)
+
             if total_input_tokens > self.max_input_tokens:
-                error = f"Input token budget exceeded ({
-                    self.max_input_tokens})."
+                error = "Input token budget exceeded "
+                error += f"({self.max_input_tokens})."
+                self.console.error(error)
                 break
             if total_output_tokens > self.max_output_tokens:
-                error = f"Output token budget exceeded ({
-                    self.max_output_tokens})."
+                error = "Output token budget exceeded "
+                error += f"({self.max_output_tokens})."
+                self.console.error(error)
                 break
 
             extraction = self.extractor.extract(llm_response)
@@ -121,6 +134,7 @@ class BaseOrchestrator(ABC):
             if extraction is None:
                 observation = self._build_observation(None, "")
             else:
+                self.console.code(extraction.code)
                 try:
                     sandbox_output = self.sandbox.run(extraction.code)
                     observation = self._build_observation(
@@ -145,6 +159,9 @@ class BaseOrchestrator(ABC):
                     success = True
                     break
 
+            self.console.observation(observation)
+            self.console.tokens(total_input_tokens, total_output_tokens)
+
             steps.append(StepMetrics(
                 step=iteration + 1,
                 input_tokens=input_tokens,
@@ -164,6 +181,8 @@ class BaseOrchestrator(ABC):
             self.conversation_history.append(
                 {"role": "user", "content": f"Observation:\n{observation}"}
             )
+
+        self.console.solved(success, len(steps))
 
         return SolutionOutput(
             task_id=self.task_id,

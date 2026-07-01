@@ -33,7 +33,8 @@ class CodeExtractor:
             return ExtractionResult(
                 match.group(1).strip(),
                 "python",
-                "Unclosed code block - closing ``` was missing, recovered anyway.")
+                "Unclosed code block - closing ``` was missing, "
+                "recovered anyway.")
         return None
 
     def _try_xml(self, text: str) -> ExtractionResult | None:
