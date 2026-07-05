@@ -37,14 +37,16 @@ automatically). The `.env` holds **only API keys** - nothing else. Multiple
 keys per provider are supported, comma-separated, and rotated on rate limits:
 
 ```bash
-# .env  - API keys only
-OPENROUTER_API_KEY=key1,key2,key3
+# .env  - API keys only (several per provider, comma-separated)
+CEREBRAS_API_KEY=key1,key2,key3
 ```
 
 The model and provider come from the CLI: `--model-name` is optional (falls
 back to the built-in default in [providers.py](src/core/llm/providers.py)), and
 `--provider-url` is optional too (falls back to `--provider`, default
-OpenRouter).
+Cerebras - the provider of the built-in default model). Every supported
+provider is free (a free tier or free-trial credits) - the project runs
+entirely on free access, no billing-enabled account.
 
 ### MBPP
 
@@ -56,8 +58,8 @@ cd moulinette && uv run moulinette_eval dump mbpp --output ../cache/mbpp_task.js
 uv run python -m agent_mbpp \
     --task-file cache/mbpp_task.json \
     --output cache/mbpp_solution.json \
-    --model-name "qwen/qwen3-235b-a22b-2507" \
-    --provider-url "https://openrouter.ai/api/v1"
+    --model-name "gemma-4-31b" \
+    --provider-url "https://api.cerebras.ai/v1"
 
 # 3. Validate
 cd moulinette && uv run moulinette_eval validate mbpp \
@@ -72,8 +74,8 @@ cd moulinette && uv run moulinette_eval dump swebench --output ../cache/swebench
 uv run python -m agent_swebench \
     --task-file cache/swebench_task.json \
     --output cache/swebench_solution.json \
-    --model-name "qwen/qwen3-235b-a22b-2507" \
-    --provider-url "https://openrouter.ai/api/v1"
+    --model-name "gemma-4-31b" \
+    --provider-url "https://api.cerebras.ai/v1"
 
 cd moulinette && uv run moulinette_eval validate swebench \
     ../cache/swebench_task.json ../cache/swebench_solution.json
@@ -86,7 +88,7 @@ By default each agent launches its own mandatory MCP tool server
 ### Sandbox CLI
 
 ```bash
-uv run sandbox                                   # interactive REPL
+uv run sandbox                                   # interactive: type a program, then Ctrl-D
 uv run sandbox sandbox.example.json              # custom configuration
 uv run sandbox --mcp-stdio "python mcp_tools_mbpp.py" sandbox.example.json
 uv run sandbox --mcp-server <URL>
@@ -129,8 +131,8 @@ Both take the exact same flags.
 | `--task-file PATH` | **yes** | path to the dumped task JSON | error, the agent stops |
 | `--output PATH` | **yes** | path where `solution.json` is written | error, the agent stops |
 | `--model-name STR` | no | any model id valid for the provider (e.g. `meta-llama/llama-3.3-70b-instruct`) | the built-in default in [providers.py](src/core/llm/providers.py) |
-| `--provider-url URL` | no | base URL of a **known** provider (must match one in the list below) | the URL of `--provider` (default OpenRouter) |
-| `--provider NAME` | no | `openrouter`, `groq`, `mistral`, `cerebras`, `together` | `openrouter`. Ignored when `--provider-url` is given |
+| `--provider-url URL` | no | base URL of a **known** provider (must match one in the list below) | the URL of `--provider` (default Cerebras) |
+| `--provider NAME` | no | `openrouter`, `groq`, `mistral`, `cerebras`, `together` | `cerebras`. Ignored when `--provider-url` is given |
 | `--mcp-stdio "CMD"` | no | a command that starts an MCP server on stdio (e.g. `"python mcp_tools_mbpp.py"`) | our own tool server on stdio (`mcp_tools_mbpp.py` / `mcp_tools_swebench.py`) |
 | `--mcp-server URL` | no | URL of an MCP server (streamable HTTP; SSE if the URL ends with `/sse`) | not used. **Takes priority over `--mcp-stdio`** when both are given |
 | `--sandbox-config PATH` | no | path to a JSON [SandboxConfig](src/core/models.py) | built-in defaults: stdlib imports allowlist, dirs `/testbed` + `/tmp/agent`, 30 s, 512 MB |
@@ -154,13 +156,13 @@ Example:
 ```bash
 uv run python -m agent_mbpp \
     --task-file cache/mbpp_task.json --output cache/mbpp_solution.json \
-    --model-name "meta-llama/llama-3.3-70b-instruct" \
-    --provider-url "https://openrouter.ai/api/v1"
+    --model-name "gemma-4-31b" \
+    --provider-url "https://api.cerebras.ai/v1"
 
 uv run python -m agent_swebench \
     --task-file cache/swebench_task.json --output cache/swebench_solution.json \
-    --model-name "meta-llama/llama-3.3-70b-instruct" \
-    --provider-url "https://openrouter.ai/api/v1"
+    --model-name "gemma-4-31b" \
+    --provider-url "https://api.cerebras.ai/v1"
 ```
 
 ### `sandbox`
@@ -178,13 +180,13 @@ Launch with `uv run sandbox [config] [flags]`.
 The sandbox always runs in `python:3.11-slim` (a code constant, not a flag).
 
 **Where the code comes from**, in priority order: `--file` → `--code` → **stdin**
-(piped input runs as a single program; an interactive terminal opens a small
-REPL). With no `config` and no MCP flag, `uv run sandbox` alone is a bare
-interactive sandbox with default limits and no tools.
+(piped input runs as a single program; an interactive terminal lets you type a
+program and run it on Ctrl-D). With no `config` and no MCP flag, `uv run
+sandbox` alone is a bare interactive sandbox with default limits and no tools.
 
 Example:
 ```bash
-uv run sandbox                                        # interactive REPL
+uv run sandbox                                        # interactive: type a program, then Ctrl-D
 echo "print(40 + 2)" | uv run sandbox                 # run a piped program
 uv run sandbox sandbox.example.json                   # with a custom config
 uv run sandbox --mcp-stdio "python mcp_tools_mbpp.py" # with tools connected

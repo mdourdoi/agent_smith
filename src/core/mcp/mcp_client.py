@@ -18,6 +18,8 @@ class MCPClientBridge:
         self._loop: asyncio.AbstractEventLoop | None = None
         self._thread: threading.Thread | None = None
         self.tools_metadata: List[Any] = []
+        self.resources_metadata: List[Any] = []
+        self.prompts_metadata: List[Any] = []
         self._ctx = None
         self._ensure_event_loop()
 
@@ -85,11 +87,23 @@ class MCPClientBridge:
 
     async def _start_session(self, streams):
         # Both transports yield (read, write, ...); open the session and
-        # remember the tools the server offers.
+        # remember what the server offers: tools, resources and prompts.
         self.session = ClientSession(streams[0], streams[1])
         await self.session.__aenter__()
         await self.session.initialize()
         self.tools_metadata = (await self.session.list_tools()).tools
+        self.resources_metadata = await self._safe_list(
+            self.session.list_resources, "resources")
+        self.prompts_metadata = await self._safe_list(
+            self.session.list_prompts, "prompts")
+
+    async def _safe_list(self, list_call, attr: str) -> List[Any]:
+        """Fetch resources/prompts, tolerating servers that don't implement
+        them (returns an empty list instead of failing the connection)."""
+        try:
+            return getattr(await list_call(), attr, [])
+        except Exception:
+            return []
 
     def get_available_tools_names(self) -> List[str]:
         return [tool.name for tool in self.tools_metadata]

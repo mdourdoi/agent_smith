@@ -124,7 +124,11 @@ class BaseOrchestrator(ABC):
             steps.append(self._step(
                 i + 1, in_tokens, out_tokens, request_ms, retries,
                 llm_output, sandbox_input, sandbox_output))
-            self.messages.append({"role": "assistant", "content": llm_output})
+            # Never store an empty assistant turn: some providers (Mistral)
+            # reject a message with no content on the next request. The step
+            # metrics below still keep the real (possibly empty) llm_output.
+            self.messages.append(
+                {"role": "assistant", "content": llm_output or "(no output)"})
             self.messages.append(
                 {"role": "user", "content": f"Observation:\n{observation}"})
 

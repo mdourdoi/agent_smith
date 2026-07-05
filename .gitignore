@@ -6,3 +6,7 @@ __pycache__/
 venv/
 *.egg-info/
 .pytest_cache/
+
+# generated outputs (subject VIII: do not commit these)
+cache/
+benchmarks/*.log

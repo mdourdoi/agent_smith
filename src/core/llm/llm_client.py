@@ -4,13 +4,29 @@ one hits a rate limit, and reports how many retries a call needed.
 import time
 import requests
 
-MAX_RETRIES_PER_KEY = 3
+MAX_RETRIES_PER_KEY = 5
 RETRY_BASE_DELAY = 2
+# Cap on a single backoff wait: long enough to ride out a per-minute rate
+# limit, short enough not to stall for ages.
+MAX_RETRY_DELAY = 30
 
 # Worth retrying (rate limit / server hiccup): wait and try the next key.
 TRANSIENT_STATUS = (429, 500, 502, 503, 504)
-# Not worth retrying (the request itself is wrong): give up right away.
-DEFINITIVE_STATUS = (400, 401, 404)
+# Not worth retrying (bad request, or out of credit): give up right away.
+DEFINITIVE_STATUS = (400, 401, 402, 404)
+
+
+def _retry_wait(response, delay: float) -> float:
+    """How long to wait before retrying a transient failure: the server's
+    Retry-After header if it sent one, otherwise the exponential delay -
+    capped either way. A 429 usually needs to wait out a per-minute window."""
+    retry_after = response.headers.get("Retry-After")
+    if retry_after:
+        try:
+            delay = float(retry_after)
+        except ValueError:
+            pass
+    return min(delay, MAX_RETRY_DELAY)
 
 
 class InvalidModelError(RuntimeError):
@@ -73,13 +89,21 @@ class LLMClient:
                     if response.status_code in TRANSIENT_STATUS:
                         last_error = f"HTTP {response.status_code}"
                         retries += 1
-                        time.sleep(delay)
+                        time.sleep(_retry_wait(response, delay))
                         delay *= 2
                         continue
 
                     response.raise_for_status()
                     data = response.json()
-                    text = data["choices"][0]["message"]["content"]
+                    # content can be null (only a tool call was returned) or a
+                    # list of parts (per the OpenAI schema); normalise both to
+                    # a plain string.
+                    content = data["choices"][0]["message"].get("content")
+                    if isinstance(content, list):
+                        content = "".join(
+                            p.get("text", "") for p in content
+                            if isinstance(p, dict))
+                    text = content or ""
                     usage = data.get("usage") or {}
                     return (text,
                             usage.get("prompt_tokens", 0),
@@ -88,7 +112,7 @@ class LLMClient:
                 except requests.exceptions.RequestException as e:
                     last_error = str(e)
                     retries += 1
-                    time.sleep(delay)
+                    time.sleep(min(delay, MAX_RETRY_DELAY))
                     delay *= 2
 
         raise AllKeysExhausted(

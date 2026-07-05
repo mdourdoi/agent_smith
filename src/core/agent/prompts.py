@@ -69,6 +69,9 @@ Rules:
 - Every code block must end with <end_code> on its own line.
 - Use the MCP tools to explore the repository and verify your patch. Their
   names, parameters and usage notes are listed in the tool manual below.
+- You have NO native function/tool-calling. The only way to use a tool is to
+  write it as Python inside the ```python block (e.g. print(read_file(...)));
+  any tool_call you emit is ignored and wastes the turn.
 - Call run_tests() (no arguments) to run the evaluation and read which
   tests pass or fail.
 - Only call final_answer after your patch is complete and run_tests shows
@@ -155,6 +158,27 @@ def build_tools_manual(client) -> str:
                         for ln in (tool.description or "").splitlines()
                         if ln.strip())
         lines.append(f"- {tool.name}({params}) - {desc}")
+
+    # Also surface the server's resources and prompts if it exposes any
+    # (tools are the callable ones; these are shown so the model knows they
+    # exist). Rebuilt from the connected server, so it stays agnostic.
+    resources = getattr(client, "resources_metadata", [])
+    if resources:
+        lines.append("")
+        lines.append("MCP resources exposed by the server (read-only data):")
+        for r in resources:
+            uri = str(getattr(r, "uri", "") or "")
+            desc = " ".join((getattr(r, "description", "") or "").split())
+            lines.append(f"- {getattr(r, 'name', '') or uri} ({uri}) - {desc}")
+
+    prompts = getattr(client, "prompts_metadata", [])
+    if prompts:
+        lines.append("")
+        lines.append("MCP prompts exposed by the server:")
+        for p in prompts:
+            desc = " ".join((getattr(p, "description", "") or "").split())
+            lines.append(f"- {getattr(p, 'name', '')} - {desc}")
+
     lines.append(
         "final_answer(answer) is always available (the sandbox provides it, "
         "not the MCP server): call it to submit and end the task.")

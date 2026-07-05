@@ -16,12 +16,12 @@ validate_swe.py              the grader used to produce every *.val.json
 ```
 
 A `<task>.val.json` with no matching `<task>.json` means the run produced no
-patch at all (rate-limited, provider-rejected, or out of credit) — the
+patch at all (rate-limited, provider-rejected, or out of credit) - the
 `status` field says which.
 
 ## The three tasks
 
-`sympy__sympy-18189`, `sympy__sympy-13480`, `pydata__xarray-4629` — all from the
+`sympy__sympy-18189`, `sympy__sympy-13480`, `pydata__xarray-4629` - all from the
 moulinette SWE-bench Verified `SEED_POOL` (`<15 min fix`).
 
 ## Grading (`validate_swe.py`)
