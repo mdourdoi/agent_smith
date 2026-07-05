@@ -1,5 +1,6 @@
 # ABOUTME: Fire CLI for moulinette evaluation tools (dump, validate, select, display).
-# ABOUTME: The moulinette does NOT run student code — it only dumps tasks and validates solutions.
+# ABOUTME: The moulinette does NOT run student code - it only dumps tasks
+# and validates solutions.
 import json
 import random
 import sys
@@ -25,19 +26,25 @@ colorama_init(autoreset=True)
 def yellow(text: str) -> str:
     return f"{Fore.YELLOW}{text}{Style.RESET_ALL}"
 
+
 def green(text: str) -> str:
     return f"{Fore.GREEN}{text}{Style.RESET_ALL}"
+
 
 def red(text: str) -> str:
     return f"{Fore.RED}{text}{Style.RESET_ALL}"
 
+
 def cyan(text: str) -> str:
     return f"{Fore.CYAN}{text}{Style.RESET_ALL}"
+
 
 def magenta(text: str) -> str:
     return f"{Fore.MAGENTA}{text}{Style.RESET_ALL}"
 
-def status_color(ok: bool, ok_text: str = "OK", fail_text: str = "EXCEEDED") -> str:
+
+def status_color(ok: bool, ok_text: str = "OK",
+                 fail_text: str = "EXCEEDED") -> str:
     if ok:
         return green(ok_text)
     return red(fail_text)
@@ -47,7 +54,8 @@ def status_color(ok: bool, ok_text: str = "OK", fail_text: str = "EXCEEDED") -> 
 SWEBENCH_EXAM_POOL = EXAM_POOL
 
 
-def _validate_swebench_patch(sb: InteractSweBench, instance_id: str, patch: str) -> bool:
+def _validate_swebench_patch(
+        sb: InteractSweBench, instance_id: str, patch: str) -> bool:
     """Validate a SWE-bench patch by running the evaluation script.
 
     Checks that the solution looks like a git patch, then runs the SWE-bench
@@ -58,7 +66,8 @@ def _validate_swebench_patch(sb: InteractSweBench, instance_id: str, patch: str)
         print("Solution doesn't look like a git patch")
         return False
     try:
-        # InteractSweBench.eval runs the SWE-bench evaluation script inside a Docker container
+        # InteractSweBench.eval runs the SWE-bench evaluation script inside a
+        # Docker container
         return sb.eval(
             instance_id=instance_id,
             container_id=None,
@@ -80,12 +89,33 @@ def _get_limits(benchmark: str) -> MetricsLimits:
         sys.exit(1)
 
 
-def _print_metrics(solution: SolutionOutput, limits: MetricsLimits, result: MetricsValidationResult) -> None:
+def _print_metrics(solution: SolutionOutput, limits: MetricsLimits,
+                   result: MetricsValidationResult) -> None:
     """Print metrics validation table and errors."""
-    print(f"Iterations: {solution.iterations} / {limits.max_iterations} {status_color(result.iterations_ok)}")
-    print(f"Input tokens: {solution.total_input_tokens} / {limits.max_input_tokens} {status_color(result.input_tokens_ok)}")
-    print(f"Output tokens: {solution.total_output_tokens} / {limits.max_output_tokens} {status_color(result.output_tokens_ok)}")
-    print(f"Time: {solution.total_time_seconds:.1f}s / {limits.max_time_seconds}s {status_color(result.time_ok)}")
+    print(
+        f"Iterations: {
+            solution.iterations} / {
+            limits.max_iterations} {
+                status_color(
+                    result.iterations_ok)}")
+    print(
+        f"Input tokens: {
+            solution.total_input_tokens} / {
+            limits.max_input_tokens} {
+                status_color(
+                    result.input_tokens_ok)}")
+    print(
+        f"Output tokens: {
+            solution.total_output_tokens} / {
+            limits.max_output_tokens} {
+                status_color(
+                    result.output_tokens_ok)}")
+    print(
+        f"Time: {
+            solution.total_time_seconds:.1f}s / {
+            limits.max_time_seconds}s {
+                status_color(
+                    result.time_ok)}")
 
     if not result.valid:
         print(f"\n{red('Errors:')}")
@@ -106,7 +136,8 @@ class MoulinetteCLI:
     Full evaluation is performed by exam scripts (exam_mbpp.sh, exam_swebench.sh).
     """
 
-    def dump(self, benchmark: str, task_id: str = None, seed: int = None, output: str = "task.json"):
+    def dump(self, benchmark: str, task_id: str = None,
+             seed: int = None, output: str = "task.json"):
         """Dump task to JSON. Random if no task_id given.
 
         Args:
@@ -151,12 +182,14 @@ class MoulinetteCLI:
             print(f"Instance {instance_id} dumped to: {output_path}")
 
         else:
-            print(red(f"Unknown benchmark: {benchmark}. Use 'mbpp' or 'swebench'."))
+            print(
+                red(f"Unknown benchmark: {benchmark}. Use 'mbpp' or 'swebench'."))
             sys.exit(1)
 
         print(f"Task saved to: {output}")
 
-    def validate(self, benchmark: str, task_file: str, solution_file: str, skip_metrics: bool = False):
+    def validate(self, benchmark: str, task_file: str,
+                 solution_file: str, skip_metrics: bool = False):
         """Validate solution (correctness + metrics).
 
         Args:
@@ -174,17 +207,17 @@ class MoulinetteCLI:
         solution_output = SolutionOutput.model_validate(solution_data)
         task_id = task_data.get("task_id") or task_data.get("instance_id")
 
-        print(f"\n{yellow('='*60)}")
+        print(f"\n{yellow('=' * 60)}")
         print(yellow("VALIDATING SOLUTION"))
-        print(f"{yellow('='*60)}")
+        print(f"{yellow('=' * 60)}")
         print(f"Task ID: {task_id}")
         print(f"Benchmark: {benchmark}")
         print(f"Success claimed: {solution_output.success}")
 
         # Step 1: Correctness validation
-        print(f"\n{yellow('='*60)}")
+        print(f"\n{yellow('=' * 60)}")
         print(yellow("STEP 1: CORRECTNESS VALIDATION"))
-        print(f"{yellow('='*60)}")
+        print(f"{yellow('=' * 60)}")
 
         if benchmark == "mbpp":
             task = MBPPTaskInput.model_validate(task_data)
@@ -198,7 +231,8 @@ class MoulinetteCLI:
         elif benchmark == "swebench":
             task = SWEBenchTaskInput.model_validate(task_data)
             sb = InteractSweBench()
-            passed = _validate_swebench_patch(sb, task.instance_id, solution_output.solution)
+            passed = _validate_swebench_patch(
+                sb, task.instance_id, solution_output.solution)
         else:
             print(red(f"Unknown benchmark: {benchmark}"))
             sys.exit(1)
@@ -208,12 +242,13 @@ class MoulinetteCLI:
         # Step 2: Metrics validation (unless skipped)
         metrics_valid = True
         if not skip_metrics:
-            print(f"\n{yellow('='*60)}")
+            print(f"\n{yellow('=' * 60)}")
             print(yellow("STEP 2: METRICS VALIDATION"))
-            print(f"{yellow('='*60)}")
+            print(f"{yellow('=' * 60)}")
 
             limits = _get_limits(benchmark)
-            result = MetricsValidationResult.validate_solution(solution_output, limits)
+            result = MetricsValidationResult.validate_solution(
+                solution_output, limits)
             _print_metrics(solution_output, limits, result)
             print(f"Metrics: {status_color(result.valid, 'VALID', 'INVALID')}")
 
@@ -222,13 +257,18 @@ class MoulinetteCLI:
             print("\n(Metrics validation skipped)")
 
         # Final result
-        print(f"\n{yellow('='*60)}")
+        print(f"\n{yellow('=' * 60)}")
         print(yellow("FINAL RESULT"))
-        print(f"{yellow('='*60)}")
+        print(f"{yellow('=' * 60)}")
         overall_passed = passed and metrics_valid
         print(f"Correctness: {status_color(passed, 'PASSED', 'FAILED')}")
         if not skip_metrics:
-            print(f"Metrics: {status_color(metrics_valid, 'VALID', 'INVALID')}")
+            print(
+                f"Metrics: {
+                    status_color(
+                        metrics_valid,
+                        'VALID',
+                        'INVALID')}")
         print(f"Overall: {status_color(overall_passed, 'PASSED', 'FAILED')}")
 
         if not overall_passed:
@@ -246,11 +286,12 @@ class MoulinetteCLI:
 
         solution_output = SolutionOutput.model_validate(solution_data)
         limits = _get_limits(benchmark)
-        result = MetricsValidationResult.validate_solution(solution_output, limits)
+        result = MetricsValidationResult.validate_solution(
+            solution_output, limits)
 
-        print(f"\n{yellow('='*60)}")
+        print(f"\n{yellow('=' * 60)}")
         print(yellow("METRICS VALIDATION"))
-        print(f"{yellow('='*60)}")
+        print(f"{yellow('=' * 60)}")
         print(f"Benchmark: {benchmark}")
         print(f"Task ID: {solution_output.task_id}")
         _print_metrics(solution_output, limits, result)
@@ -259,7 +300,8 @@ class MoulinetteCLI:
         if not result.valid:
             sys.exit(1)
 
-    def select(self, benchmark: str = "swebench", count: int = 3, seed: int = None, output: str = None):
+    def select(self, benchmark: str = "swebench", count: int = 3,
+               seed: int = None, output: str = None):
         """Select random tasks from the exam pool.
 
         Args:
@@ -269,13 +311,15 @@ class MoulinetteCLI:
             output: Output JSON file (prints to stdout if not given)
         """
         if benchmark != "swebench":
-            print(red(f"Select is only supported for swebench (got: {benchmark})"))
+            print(
+                red(f"Select is only supported for swebench (got: {benchmark})"))
             sys.exit(1)
 
         pool = SWEBENCH_EXAM_POOL
 
         if count > len(pool):
-            print(red(f"Requested {count} tasks but pool only has {len(pool)}"))
+            print(
+                red(f"Requested {count} tasks but pool only has {len(pool)}"))
             sys.exit(1)
 
         if seed is not None:
@@ -283,12 +327,16 @@ class MoulinetteCLI:
 
         selected = random.sample(pool, count)
 
-        print(f"Selected {count}/{len(pool)} tasks from exam pool:", file=sys.stderr)
+        print(
+            f"Selected {count}/{len(pool)} tasks from exam pool:", file=sys.stderr)
         for task_id in selected:
             print(f"  - {task_id}", file=sys.stderr)
 
         # Output as JSON (to stdout for piping, or to file)
-        output_data = {"instance_ids": selected, "count": count, "pool_size": len(pool)}
+        output_data = {
+            "instance_ids": selected,
+            "count": count,
+            "pool_size": len(pool)}
 
         if output:
             output_path = Path(output)
@@ -314,32 +362,38 @@ class MoulinetteCLI:
         truncate_len = 999_999 if full else 2000
 
         # Header
-        print(f"\n{yellow('='*60)}")
+        print(f"\n{yellow('=' * 60)}")
         print(yellow("SOLUTION DISPLAY"))
-        print(f"{yellow('='*60)}")
+        print(f"{yellow('=' * 60)}")
         print(f"Task ID:       {solution.task_id}")
         print(f"Benchmark:     {solution.benchmark}")
         print(f"Success:       {status_color(solution.success, 'YES', 'NO')}")
         print(f"Iterations:    {solution.iterations}")
-        print(f"Total tokens:  {solution.total_input_tokens} in / {solution.total_output_tokens} out")
+        print(
+            f"Total tokens:  {
+                solution.total_input_tokens} in / {
+                solution.total_output_tokens} out")
         print(f"Time:          {solution.total_time_seconds:.1f}s")
         print(f"Timestamp:     {solution.timestamp}")
 
         # System prompt
-        print(f"\n{yellow('='*60)}")
+        print(f"\n{yellow('=' * 60)}")
         print(yellow("SYSTEM PROMPT"))
-        print(f"{yellow('='*60)}")
+        print(f"{yellow('=' * 60)}")
         prompt = solution.system_prompt or "(empty)"
         if len(prompt) > truncate_len:
             print(prompt[:truncate_len])
-            print(f"\n... ({len(prompt) - truncate_len} chars truncated, use --full to show all)")
+            print(
+                f"\n... ({
+                    len(prompt) -
+                    truncate_len} chars truncated, use --full to show all)")
         else:
             print(prompt)
 
         # Per-step table
-        print(f"\n{yellow('='*60)}")
+        print(f"\n{yellow('=' * 60)}")
         print(yellow("STEP-BY-STEP TRACE"))
-        print(f"{yellow('='*60)}")
+        print(f"{yellow('=' * 60)}")
 
         if not solution.steps:
             print("(no steps recorded)")
@@ -356,12 +410,18 @@ class MoulinetteCLI:
                 print(f"{yellow('━' * 60)}")
 
                 # Metadata block
-                print(f"  {green('Model:')}      {step.model_name or '(empty)'}")
+                print(
+                    f"  {
+                        green('Model:')}      {
+                        step.model_name or '(empty)'}")
                 print(f"  {green('API URL:')}    {step.api_url or '(empty)'}")
-                print(f"  {green('Tokens:')}     {step.input_tokens} in / {step.output_tokens} out")
+                print(
+                    f"  {green('Tokens:')}     {step.input_tokens} in / {step.output_tokens} out")
                 print(f"  {green('Time:')}       {step.request_time_ms:.0f}ms")
                 print(f"  {green('Timestamp:')}  {step.timestamp}")
-                retries_display = red(str(retries)) if retries > 0 else green(str(retries))
+                retries_display = red(
+                    str(retries)) if retries > 0 else green(
+                    str(retries))
                 print(f"  {green('Retries:')}    {retries_display}")
 
                 # LLM output
@@ -373,7 +433,10 @@ class MoulinetteCLI:
                     print(f"    {line}")
 
                 # Sandbox input (code sent)
-                print(f"\n  {green('Sandbox Input')} ({len(sandbox_in)} chars):")
+                print(
+                    f"\n  {
+                        green('Sandbox Input')} ({
+                        len(sandbox_in)} chars):")
                 si_preview = sandbox_in[:300]
                 if len(sandbox_in) > 300:
                     si_preview += f"... ({len(sandbox_in) - 300} more chars)"
@@ -381,7 +444,10 @@ class MoulinetteCLI:
                     print(f"    {line}")
 
                 # Sandbox output (execution result)
-                print(f"\n  {magenta('Sandbox Output')} ({len(sandbox_out)} chars):")
+                print(
+                    f"\n  {
+                        magenta('Sandbox Output')} ({
+                        len(sandbox_out)} chars):")
                 so_preview = sandbox_out[:300]
                 if len(sandbox_out) > 300:
                     so_preview += f"... ({len(sandbox_out) - 300} more chars)"
@@ -389,9 +455,9 @@ class MoulinetteCLI:
                     print(f"    {line}")
 
         # Consistency checks
-        print(f"\n{yellow('='*60)}")
+        print(f"\n{yellow('=' * 60)}")
         print(yellow("CONSISTENCY CHECKS"))
-        print(f"{yellow('='*60)}")
+        print(f"{yellow('=' * 60)}")
 
         issues = []
         notes = []
@@ -403,7 +469,9 @@ class MoulinetteCLI:
         # Check: sandbox_input non-empty for steps that have sandbox_output
         for step in solution.steps:
             if step.sandbox_output and not step.sandbox_input:
-                issues.append(f"Step {step.step}: has sandbox_output but empty sandbox_input")
+                issues.append(
+                    f"Step {
+                        step.step}: has sandbox_output but empty sandbox_input")
 
         # Check: llm_output non-empty
         for step in solution.steps:
@@ -420,7 +488,10 @@ class MoulinetteCLI:
         prev_ts = None
         for step in solution.steps:
             if prev_ts and step.timestamp < prev_ts:
-                issues.append(f"Step {step.step}: timestamp {step.timestamp} < previous {prev_ts}")
+                issues.append(
+                    f"Step {
+                        step.step}: timestamp {
+                        step.timestamp} < previous {prev_ts}")
             prev_ts = step.timestamp
 
         # Check: model_name consistent
@@ -428,13 +499,15 @@ class MoulinetteCLI:
         if len(model_names) > 1:
             issues.append(f"Multiple model_names across steps: {model_names}")
 
-        # Check: no identical sandbox_input in consecutive steps (copy-paste detection)
+        # Check: no identical sandbox_input in consecutive steps (copy-paste
+        # detection)
         for i in range(1, len(solution.steps)):
             prev_code = solution.steps[i - 1].sandbox_input
             curr_code = solution.steps[i].sandbox_input
             if prev_code and curr_code and prev_code == curr_code:
                 issues.append(
-                    f"Steps {solution.steps[i-1].step} and {solution.steps[i].step}: "
+                    f"Steps {solution.steps[i -
+                                            1].step} and {solution.steps[i].step}: "
                     f"identical sandbox_input (copy-paste?)"
                 )
 

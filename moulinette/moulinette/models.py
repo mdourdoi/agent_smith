@@ -1,5 +1,6 @@
-# ABOUTME: Internal moulinette models — re-exports public models and adds validation/factory logic.
-# ABOUTME: Keeps from_moulinette classmethods, MetricsLimits, and MetricsValidationResult.
+# ABOUTME: Internal moulinette models - re-exports public models and adds validation/factory logic.
+# ABOUTME: Keeps from_moulinette classmethods, MetricsLimits, and
+# MetricsValidationResult.
 import sys
 from pathlib import Path
 from typing import List
@@ -127,19 +128,31 @@ class MetricsValidationResult(BaseModel):
 
         iterations_ok = solution.iterations <= limits.max_iterations
         if not iterations_ok:
-            errors.append(f"Iterations {solution.iterations} exceeds limit {limits.max_iterations}")
+            errors.append(
+                f"Iterations {
+                    solution.iterations} exceeds limit {
+                    limits.max_iterations}")
 
         input_tokens_ok = solution.total_input_tokens <= limits.max_input_tokens
         if not input_tokens_ok:
-            errors.append(f"Input tokens {solution.total_input_tokens} exceeds limit {limits.max_input_tokens}")
+            errors.append(
+                f"Input tokens {
+                    solution.total_input_tokens} exceeds limit {
+                    limits.max_input_tokens}")
 
         output_tokens_ok = solution.total_output_tokens <= limits.max_output_tokens
         if not output_tokens_ok:
-            errors.append(f"Output tokens {solution.total_output_tokens} exceeds limit {limits.max_output_tokens}")
+            errors.append(
+                f"Output tokens {
+                    solution.total_output_tokens} exceeds limit {
+                    limits.max_output_tokens}")
 
         time_ok = solution.total_time_seconds <= limits.max_time_seconds
         if not time_ok:
-            errors.append(f"Time {solution.total_time_seconds}s exceeds limit {limits.max_time_seconds}s")
+            errors.append(
+                f"Time {
+                    solution.total_time_seconds}s exceeds limit {
+                    limits.max_time_seconds}s")
 
         return cls(
             valid=iterations_ok and input_tokens_ok and output_tokens_ok and time_ok,

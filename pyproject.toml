@@ -1,17 +1,34 @@
 [project]
 name = "agent-smith"
 version = "0.1.0"
-description = "Add your description here"
+description = "Autonomous reasoning, code generation and execution agent (MBPP + SWE-bench)."
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.10"
 dependencies = [
-    "flake8>=7.3.0",
     "mcp>=1.28.1",
-    "mypy>=1.19.1",
     "pydantic>=2.13.4",
     "python-dotenv>=1.2.2",
     "requests>=2.34.2",
 ]
+
+[project.optional-dependencies]
+dev = [
+    "flake8>=7.3.0",
+    "mypy>=1.19.1",
+]
+
+[project.scripts]
+sandbox = "sandbox_cli:main"
+agent_mbpp = "agent_mbpp:main"
+agent_swebench = "agent_swebench:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+py-modules = ["agent_mbpp", "agent_swebench", "sandbox_cli"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
