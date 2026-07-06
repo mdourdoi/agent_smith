@@ -14,8 +14,6 @@ def run_tests(code: str, tests: List[str]) -> str:
     """Run the given code against the task's assertions. Returns "All tests
     passed." or the list of failing assertions.
     """
-    # code + assertions run in a separate process so a bad solution (crash,
-    # infinite loop) can't take down this server.
     script = code + "\n"
     for i, test in enumerate(tests):
         script += (

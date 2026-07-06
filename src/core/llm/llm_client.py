@@ -6,13 +6,9 @@ import requests
 
 MAX_RETRIES_PER_KEY = 5
 RETRY_BASE_DELAY = 2
-# Cap on a single backoff wait: long enough to ride out a per-minute rate
-# limit, short enough not to stall for ages.
 MAX_RETRY_DELAY = 30
 
-# Worth retrying (rate limit / server hiccup): wait and try the next key.
 TRANSIENT_STATUS = (429, 500, 502, 503, 504)
-# Not worth retrying (bad request, or out of credit): give up right away.
 DEFINITIVE_STATUS = (400, 401, 402, 404)
 
 
@@ -50,7 +46,7 @@ class LLMClient:
                          else f"{base}/chat/completions")
         self.stop_sequences = stop_sequences or ["<end_code>"]
         self.temperature = temperature
-        self.max_tokens = max_tokens  # cap each reply, protects the budget
+        self.max_tokens = max_tokens
 
     def call(self, messages: list[dict]) -> tuple[str, int, int, int]:
         """Return (text, input_tokens, output_tokens, retries).
@@ -95,9 +91,6 @@ class LLMClient:
 
                     response.raise_for_status()
                     data = response.json()
-                    # content can be null (only a tool call was returned) or a
-                    # list of parts (per the OpenAI schema); normalise both to
-                    # a plain string.
                     content = data["choices"][0]["message"].get("content")
                     if isinstance(content, list):
                         content = "".join(

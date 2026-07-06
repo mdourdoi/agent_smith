@@ -74,8 +74,6 @@ class MCPClientBridge:
         await self._start_session(streams)
 
     async def _init_http(self, url):
-        # Streamable HTTP by default; use the older SSE transport only if
-        # the URL points at an /sse endpoint.
         if url.rstrip("/").endswith("/sse"):
             from mcp.client.sse import sse_client
             self._ctx = sse_client(url)
@@ -86,8 +84,6 @@ class MCPClientBridge:
         await self._start_session(streams)
 
     async def _start_session(self, streams):
-        # Both transports yield (read, write, ...); open the session and
-        # remember what the server offers: tools, resources and prompts.
         self.session = ClientSession(streams[0], streams[1])
         await self.session.__aenter__()
         await self.session.initialize()

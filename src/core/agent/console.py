@@ -1,5 +1,4 @@
 class Console:
-    # ANSI codes
     RESET = "\033[0m"
     BOLD = "\033[1m"
     DIM = "\033[2m"
@@ -41,7 +40,6 @@ class Console:
     def thought(self, text: str) -> None:
         if not self.verbose or not text.strip():
             return
-        # Show only the prose before the first code block, trimmed.
         prose = text.split("```")[0].strip()
         if not prose:
             return

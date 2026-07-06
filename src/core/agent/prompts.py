@@ -159,9 +159,6 @@ def build_tools_manual(client) -> str:
                         if ln.strip())
         lines.append(f"- {tool.name}({params}) - {desc}")
 
-    # Also surface the server's resources and prompts if it exposes any
-    # (tools are the callable ones; these are shown so the model knows they
-    # exist). Rebuilt from the connected server, so it stays agnostic.
     resources = getattr(client, "resources_metadata", [])
     if resources:
         lines.append("")

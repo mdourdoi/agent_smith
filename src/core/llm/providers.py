@@ -4,10 +4,6 @@ from urllib.parse import urlparse
 
 DEFAULT_PROVIDER = "cerebras"
 
-# Model used when --model-name is not given. Set it to your best model.
-# Chosen from the benchmark (see BENCHMARK_REPORT.md): gemma-4-31b resolved
-# 3/3 of the sampled Verified tasks on a free provider. deepseek/deepseek-chat
-# (OpenRouter) also scored 3/3 and is faster/leaner, but it is paid.
 DEFAULT_MODEL = "gemma-4-31b"
 
 

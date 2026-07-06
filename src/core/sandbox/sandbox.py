@@ -57,8 +57,6 @@ class Sandbox:
         self._launch_server()
 
     def _launch_server(self) -> None:
-        # The server needs the tool names (to expose them) and the config
-        # (to enforce the import/path limits).
         tool_arg = ",".join(self._tool_names())
         config_arg = json.dumps({
             "authorized_imports": self.config.authorized_imports,
@@ -84,8 +82,6 @@ class Sandbox:
             line = self._read_with_timeout(
                 self.config.max_execution_time_seconds)
             if line is None:
-                # The code ran too long (or ran out of memory): the read
-                # timed out, so we drop the container and start fresh.
                 self._restart_container()
                 return (
                     "ERROR: Execution timed out after "
@@ -95,16 +91,10 @@ class Sandbox:
 
             msg = json.loads(line)
 
-            # The code called a tool: its proxy asked us to run the real
-            # tool here on the host. We do it, send the result back down the
-            # pipe, and keep reading the same block. Tool time does not
-            # count against the sandbox timeout.
             if "tool_call" in msg:
                 self._run_tool_on_host(msg["tool_call"])
                 continue
 
-            # SystemExit / KeyboardInterrupt from the code aren't
-            # observations: let them bubble up so the run can shut down.
             if msg.get("control") == "SystemExit":
                 raise SystemExit("Sandboxed code raised SystemExit.")
             if msg.get("control") == "KeyboardInterrupt":

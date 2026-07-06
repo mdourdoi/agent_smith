@@ -57,14 +57,12 @@ class SweContainer:
                 "No SWE-bench container configured. Set SWEBENCH_TASK_FILE, "
                 "SWEBENCH_IMAGE or SWEBENCH_CONTAINER.")
         name = "agent_smith_swe_" + uuid.uuid4().hex[:12]
-        # docker run pulls the image if it isn't already local.
         subprocess.run(
             ["docker", "run", "-d", "--name", name, self.image,
              "tail", "-f", "/dev/null"],
             check=True, capture_output=True, text=True)
         self.name = name
         self.owned = True
-        # git won't touch a tree owned by someone else without this.
         subprocess.run(
             ["docker", "exec", name, "git", "config", "--global",
              "--add", "safe.directory", WORKDIR],
@@ -239,8 +237,6 @@ def run_tests() -> str:
     if rc != 0:
         return "Error preparing eval script: %s" % err.strip()
     rc, out, err = _exec(["bash", "/tmp/eval.sh"], timeout=EVAL_TIMEOUT)
-    # Put the test output last: its pass/fail summary is at the very end,
-    # so it survives the truncation below.
     parts = []
     if err.strip():
         parts.append("--- setup / stderr ---\n" + err.strip())

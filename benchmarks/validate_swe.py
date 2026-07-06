@@ -66,7 +66,6 @@ def main():
         dexec(name, ["git", "config", "--global", "--add",
                      "safe.directory", WORKDIR])
 
-        # Apply the model patch (same fallbacks as the moulinette).
         applied = False
         if patch.strip():
             dexec(name, ["sh", "-c", "cat > /tmp/patch.diff"],
@@ -81,7 +80,6 @@ def main():
             if not applied:
                 result["note"] = "patch did not apply"
 
-        # Run the eval script and capture its output.
         dexec(name, ["sh", "-c", "cat > /eval.sh"],
               input_bytes=eval_script.encode("utf-8"))
         r = dexec(name, ["bash", "/eval.sh"], timeout=EVAL_TIMEOUT)

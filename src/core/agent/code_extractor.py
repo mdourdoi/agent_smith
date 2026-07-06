@@ -12,7 +12,7 @@ from dataclasses import dataclass
 @dataclass
 class ExtractionResult:
     code: str
-    original_format: str  # "python", "xml", "hermes", "react"
+    original_format: str
     warning: str | None
 
 
@@ -28,7 +28,6 @@ class CodeExtractor:
                           text, re.DOTALL)
         if match:
             return ExtractionResult(match.group(1).strip(), "python", None)
-        # No closing fence: recover what's after the opening one anyway.
         match = re.search(r"```python\s*\n(.*)", text, re.DOTALL)
         if match:
             return ExtractionResult(

@@ -1,4 +1,4 @@
-*This project has been created as part of the 42 curriculum by mdourdoi.*
+*This project has been created as part of the 42 curriculum by mobenhab and mdourdoi.*
 
 # Agent Smith
 
@@ -228,14 +228,14 @@ CLI, not through the environment.
              ┌──────────────────────── agent process (host) ──────────────────────┐
              │                                                                    │
    task ──►  │  Orchestrator ──► LLM API (multi-provider, key rotation)           │
-             │      │  ▲            (Thought → Code → Observation loop)           │
-             │      ▼  │ observation                                              │
+             │      │               (Thought → Code → Observation loop)           │
+             │      ▼                                                             │
              │  CodeExtractor  (python / XML / hermes / ReAct → Python)           │
              │      │                                                             │
-             │      ▼ code                                                        │
+             │      ▼                                                             │
              │   Sandbox ──stdin/stdout──►  sandbox container (python:3.11-slim)  │
              │      │                          runs LLM code under security       │
-             │      │  tool_call                policies + final_answer()         │
+             │      │                           policies + final_answer()         │
              │      ▼                                                             │
              │   MCP client ──stdio/HTTP──►  MCP tool server (mcp_tools_*.py)     │
              └────────────────────────────────────────────│───────────────────────┘
@@ -344,7 +344,4 @@ that produced them.
 
 **Use of AI.** AI assistance was used to draft boilerplate (argument parsing,
 docstrings), to review the sandbox security policies against the subject's
-requirements, and to help structure this documentation. Every architectural
-decision - the two-container SWE-bench bridge, the security model, the MCP
-wiring - was made and reviewed by the author, and the agent loop is our own
-implementation (no agent-orchestration library is used).
+requirements, and to help structure this documentation.

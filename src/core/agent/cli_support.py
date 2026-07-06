@@ -14,7 +14,6 @@ from core.llm import (
 from core.agent.console import Console
 from core.agent.prompts import build_tools_manual
 
-# Both agents run their glue code in a plain Python image.
 SANDBOX_IMAGE = "python:3.11-slim"
 
 

@@ -1,6 +1,7 @@
 """CLI: solve one MBPP task and write the solution to a JSON file."""
 import os
 import argparse
+import sys
 
 from dotenv import load_dotenv
 
@@ -28,9 +29,13 @@ def main() -> None:
         task_message=build_mbpp_task_message(task),
         task_id=str(task.task_id),
         default_tools=DEFAULT_TOOLS,
-        max_tokens=512,  # MBPP answers are short
+        max_tokens=512,
     )
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f"ERROR: {e}")
+        sys.exit(1)

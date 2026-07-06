@@ -20,11 +20,8 @@ import os
 import json
 import builtins as _builtins
 
-# Beyond this many characters, output is cut with a note so the model knows
-# it didn't see everything (and a huge dump can't blow the token budget).
 MAX_OUTPUT_CHARS = 8000
 
-# Builtins we take away: they run dynamic code or would block on our stdio.
 _BLOCKED_BUILTINS = (
     "eval", "exec", "compile", "input",
     "breakpoint", "help", "exit", "quit",
@@ -71,8 +68,6 @@ class SandboxServer:
         return safe
 
     def _capture_print(self, *args, sep=" ", end="\n", file=None, **_):
-        # Capture the code's output instead of writing to stdout (which we
-        # keep for the host protocol). Honour an explicit file if given.
         text = sep.join(str(a) for a in args) + end
         if file is None:
             self._output.append(text)
@@ -98,8 +93,6 @@ class SandboxServer:
         return _builtins.open(file, mode, *args, **kwargs)
 
     def _final_answer_fn(self):
-        # Not an MCP tool: it lives in the namespace and just stashes its
-        # argument, which the host reads after the code finishes.
         def final_answer(answer):
             self._final_answer["value"] = answer
         return final_answer
@@ -116,8 +109,6 @@ class SandboxServer:
             return (self._receive() or {}).get("tool_result", "")
         return call_tool
 
-    # -- host protocol: one line of JSON per message -------------------
-
     def _send(self, message: dict) -> None:
         sys.stdout.write(json.dumps(message) + "\n")
         sys.stdout.flush()
@@ -125,7 +116,7 @@ class SandboxServer:
     def _receive(self) -> dict | None:
         line = sys.stdin.readline()
         if not line:
-            return None            # pipe closed
+            return None
         line = line.strip()
         if not line:
             return {}
@@ -141,8 +132,6 @@ class SandboxServer:
         return (f"{text[:MAX_OUTPUT_CHARS]}\n"
                 f"... [output truncated: {dropped} more characters]")
 
-    # -- execution ------------------------------------------------------
-
     def execute(self, code: str) -> dict:
         self._final_answer.clear()
         self._output = []
@@ -151,7 +140,6 @@ class SandboxServer:
         try:
             exec(code, self.namespace)
         except (KeyboardInterrupt, SystemExit) as e:
-            # Shutdown signals: pass them to the host instead of swallowing.
             control = type(e).__name__
         except Exception as e:
             error = f"ERROR: {type(e).__name__}: {e}"

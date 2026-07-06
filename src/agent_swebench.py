@@ -1,6 +1,7 @@
 """CLI: solve one SWE-bench task and write the git patch to a JSON file."""
 import os
 import argparse
+import sys
 
 from dotenv import load_dotenv
 
@@ -21,8 +22,6 @@ def main() -> None:
     args = parser.parse_args()
 
     task = SWEBenchTaskInput.model_validate(load_task(args.task_file))
-    # The tool server reads the image and eval script from this file; the
-    # MCP client forwards the environment to that process.
     os.environ["SWEBENCH_TASK_FILE"] = os.path.abspath(args.task_file)
 
     run_agent(
@@ -33,11 +32,13 @@ def main() -> None:
         task_id=task.instance_id,
         default_tools=DEFAULT_TOOLS,
         max_tokens=3000,
-        # A little randomness helps recover from a failed exact-match edit;
-        # greedy decoding tends to repeat the same wrong attempt.
         temperature=0.5,
     )
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f"ERROR: {e}")
+        sys.exit(1)

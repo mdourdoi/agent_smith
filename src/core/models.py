@@ -47,9 +47,9 @@ class StepMetrics(BaseModel):
 class SolutionOutput(BaseModel):
     """The full result of a run, written to solution.json."""
     task_id: str
-    benchmark: str  # "mbpp" or "swebench"
+    benchmark: str
     success: bool
-    solution: str   # the code for MBPP, the git patch for SWE-bench
+    solution: str
     system_prompt: str
     iterations: int
     total_requests: int

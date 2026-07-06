@@ -11,8 +11,6 @@ from core.agent.console import Console
 
 
 class BaseOrchestrator(ABC):
-    # Per-benchmark limits, filled in by the subclasses below. The
-    # evaluation rejects a run that goes over any of them.
     max_iterations: int
     max_input_tokens: int
     max_output_tokens: int
@@ -21,7 +19,7 @@ class BaseOrchestrator(ABC):
     def __init__(
         self,
         sandbox: Sandbox,
-        call_llm,          # messages -> (text, in_tokens, out_tokens, retries)
+        call_llm,
         system_prompt: str,
         task_id: str,
         model_name: str,
@@ -72,7 +70,6 @@ class BaseOrchestrator(ABC):
                 self.console.error(error)
                 break
 
-            # Ask the model.
             call_start = time.monotonic()
             llm_output, in_tokens, out_tokens, retries = self.call_llm(
                 self.messages)
@@ -82,7 +79,6 @@ class BaseOrchestrator(ABC):
             total_retries += retries
             self.console.thought(llm_output)
 
-            # Stop as soon as a token budget is blown.
             if total_in > self.max_input_tokens:
                 error = ("Input token budget exceeded "
                          f"({self.max_input_tokens}).")
@@ -94,7 +90,6 @@ class BaseOrchestrator(ABC):
                 self.console.error(error)
                 break
 
-            # Turn the reply into code and run it.
             extraction = self.extractor.extract(llm_output)
             sandbox_input = extraction.code if extraction else ""
             sandbox_output = ""
@@ -107,7 +102,6 @@ class BaseOrchestrator(ABC):
                     sandbox_output = self.sandbox.run(extraction.code)
                     observation = self._observation(extraction, sandbox_output)
                 except FinalAnswerSignal as signal:
-                    # The model called final_answer: record the step and stop.
                     self.messages.append(
                         {"role": "assistant", "content": llm_output})
                     steps.append(self._step(
@@ -124,9 +118,6 @@ class BaseOrchestrator(ABC):
             steps.append(self._step(
                 i + 1, in_tokens, out_tokens, request_ms, retries,
                 llm_output, sandbox_input, sandbox_output))
-            # Never store an empty assistant turn: some providers (Mistral)
-            # reject a message with no content on the next request. The step
-            # metrics below still keep the real (possibly empty) llm_output.
             self.messages.append(
                 {"role": "assistant", "content": llm_output or "(no output)"})
             self.messages.append(
