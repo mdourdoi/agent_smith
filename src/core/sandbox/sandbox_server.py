@@ -1,16 +1,20 @@
 """Runs inside the sandbox container. Standard library only (the image has
 nothing else installed).
 
-It runs the model's code with three limits enforced in Python:
+It runs the model's code with four limits enforced in Python:
   - imports: only what the allowlist permits
   - builtins: the dangerous ones are removed
   - open(): only paths under the allowed directories
+  - memory: an rlimit so oversized allocations raise a catchable
+    MemoryError instead of the kernel OOM-killing the process
 
-Network, memory and timeout are handled outside, by Docker and the host.
+Network and timeout are handled outside, by Docker and the host (Docker's
+--memory cap also backs the rlimit as a hard ceiling).
 
 Communication with the host is line-delimited JSON over stdin/stdout. The
-code's own print() output is captured into a buffer (we override print),
-so stdout is used *only* for that protocol - no juggling of stdout.
+code's own print() output is captured into a buffer (we override print)
+and also streamed line by line to the host, so partial output survives a
+timeout; stdout is used *only* for that protocol - no juggling of stdout.
 
 MCP tools show up as functions the code can call; calling one sends the
 call to the host and returns whatever the host answers.
@@ -51,6 +55,11 @@ class SandboxServer:
                  allowed_directories=None):
         self.authorized_imports = authorized_imports or []
         self.allowed_directories = allowed_directories or []
+        for directory in self.allowed_directories:
+            try:
+                os.makedirs(directory, exist_ok=True)
+            except OSError:
+                pass
         self._final_answer: dict = {}
         self._output: list = []
         self.namespace: dict = {"__builtins__": self._safe_builtins()}
@@ -71,6 +80,7 @@ class SandboxServer:
         text = sep.join(str(a) for a in args) + end
         if file is None:
             self._output.append(text)
+            self._send({"partial_output": text})
         else:
             file.write(text)
 
@@ -168,9 +178,24 @@ def _parse_config(raw: str | None) -> dict:
         return {}
 
 
+def _limit_memory(max_memory_mb) -> None:
+    """Cap this process's address space so an oversized allocation raises a
+    catchable MemoryError instead of the kernel OOM-killing the process
+    outright (which Docker's own --memory limit would otherwise do)."""
+    if not max_memory_mb:
+        return
+    try:
+        import resource
+        max_bytes = int(max_memory_mb) * 1024 * 1024
+        resource.setrlimit(resource.RLIMIT_AS, (max_bytes, max_bytes))
+    except (ImportError, ValueError, OSError):
+        pass
+
+
 if __name__ == "__main__":
     names = sys.argv[1].split(",") if len(sys.argv) > 1 and sys.argv[1] else []
     config = _parse_config(sys.argv[2] if len(sys.argv) > 2 else None)
+    _limit_memory(config.get("max_memory_mb"))
     SandboxServer(
         tool_names=names,
         authorized_imports=config.get("authorized_imports", []),

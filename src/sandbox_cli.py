@@ -42,7 +42,8 @@ def run(sandbox: Sandbox, code: str) -> str:
     try:
         return sandbox.run(code)
     except FinalAnswerSignal as signal:
-        return f"final_answer: {signal.answer}"
+        prefix = f"{signal.output}\n" if signal.output.strip() else ""
+        return f"{prefix}final_answer: {signal.answer}"
 
 
 def interactive(sandbox: Sandbox) -> None:
@@ -94,6 +95,10 @@ def main() -> int:
             print(run(sandbox, args.code))
         else:
             interactive(sandbox)
+    except KeyboardInterrupt as exc:
+        msg = f"Interrupted: {exc}" if str(exc) else "Interrupted."
+        print(msg, file=sys.stderr)
+        return 130
     except Exception as exc:
         print(f"ERROR: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 1

@@ -85,6 +85,47 @@ By default each agent launches its own mandatory MCP tool server
 (`mcp_tools_mbpp.py` / `mcp_tools_swebench.py`). Override with
 `--mcp-stdio "<command>"` or `--mcp-server <URL>`.
 
+#### `moulinette validate swebench` on rootless Docker
+
+On a machine running Docker in **rootless mode**, `moulinette_eval validate
+swebench` can fail at "STEP 1: CORRECTNESS VALIDATION" with:
+
+```
+Error validating solution: ... "failed to Lchown ... invalid argument"
+```
+
+This comes from the `swebench` package moulinette depends on: its
+`copy_to_container()` (`swebench/harness/docker_utils.py`) tars the patch
+file with the *host* file's uid/gid, then extracts it into the verification
+container via Docker's `put_archive` API, which `lchown`s to that uid/gid.
+Rootless Docker maps the daemon into a user namespace limited to the
+`/etc/subuid`/`/etc/subgid` range; if your real uid/gid falls outside that
+range (common on a shared machine where the range isn't reallocated per
+user), the chown is rejected and the container never even gets created.
+
+This is a bug in the vendored `swebench` package, not in this repository -
+the agent itself is unaffected (`mcp_tools_swebench.py` never uses
+`put_archive`, only `docker exec` + stdin). If you hit this, patch the
+installed copy in moulinette's own venv:
+
+```python
+# moulinette/.venv/lib/python3.13/site-packages/swebench/harness/docker_utils.py
+def _root_owned(tarinfo):
+    tarinfo.uid = 0
+    tarinfo.gid = 0
+    tarinfo.uname = ""
+    tarinfo.gname = ""
+    return tarinfo
+
+with tarfile.open(tar_path, "w") as tar:
+    tar.add(src, arcname=dst.name, filter=_root_owned)  # was: tar.add(src, arcname=dst.name)
+```
+
+uid/gid `0` is always mapped by any user namespace, so the chown always
+succeeds. This edit lives in a virtualenv and is wiped by the next `uv sync`
+inside `moulinette/` - reapply it if validation starts failing again with
+the same error.
+
 ### Sandbox CLI
 
 ```bash
@@ -195,15 +236,21 @@ uv run sandbox --mcp-stdio "python mcp_tools_mbpp.py" # with tools connected
 ### MCP tool servers (usually started for you)
 
 `mcp_tools_mbpp.py` and `mcp_tools_swebench.py` normally run **on stdio, started
-automatically by the agent**; you rarely launch them by hand. They take **no
-flags**. The SWE-bench server is configured through environment variables (the
-agent sets `SWEBENCH_TASK_FILE` for you):
+automatically by the agent**; you rarely launch them by hand. "stdio" here is
+the MCP transport: JSON-RPC messages travel over the server's stdin/stdout, so
+a hand-launched server just waits silently for a client. Their only argument
+is an optional **`http`**, which serves the same tools over streamable HTTP
+instead (endpoint `http://127.0.0.1:8000/mcp` - connect with
+`--mcp-server http://127.0.0.1:8000/mcp`); any other argument is rejected
+with a usage error. The SWE-bench server is configured through environment
+variables (the agent sets `SWEBENCH_TASK_FILE` for you):
 
 | Variable | Required | Meaning | If omitted |
 |----------|----------|---------|------------|
-| `SWEBENCH_TASK_FILE` | one of the two | path to a dumped task.json (Docker image + eval script) | - |
-| `SWEBENCH_IMAGE` | one of the two | Docker image to run | falls back to the image in the task file |
-| `SWEBENCH_CONTAINER` | no | name/id of an already-running container to reuse | a fresh container is created and removed at exit |
+| `SWEBENCH_TASK_FILE` | one of the four | path to a dumped task.json (Docker image + eval script) | - |
+| `SWEBENCH_IMAGE` | one of the four | Docker image to run | falls back to the image in the task file |
+| `SWEBENCH_CONTAINER` | one of the four | name/id of an already-running container to reuse | a fresh container is created and removed at exit |
+| `TESTBED_PATH` | one of the four | local directory standing in for `/testbed` - tools run on the host, no container (standalone tool testing) | a container/image is used; those take precedence |
 | `SWEBENCH_EVAL_TIMEOUT` | no | seconds allowed for `run_tests` | `400` |
 
 Example (rarely needed - the agent starts these for you):
@@ -290,8 +337,12 @@ Two independent security domains (as the subject frames it):
   - **Restricted builtins** - `eval`, `exec`, `compile`, `input`, ... are
     removed from the execution namespace.
   - **Path restriction** - `open` is limited to `allowed_directories`.
-  - **No network / memory limit / timeout** - enforced by Docker
-    (`--network none`, `--memory`) and by a host-side execution timeout.
+  - **Memory limit** - an in-process rlimit makes oversized allocations
+    raise a catchable `MemoryError`; Docker's `--memory` stays as the hard
+    ceiling.
+  - **No network / timeout** - enforced by Docker (`--network none`) and by
+    a host-side execution timeout. Output printed before a timeout is
+    preserved (prints are streamed to the host, not just buffered).
   - `KeyboardInterrupt` / `SystemExit` are propagated to the agent loop for a
     clean shutdown instead of being swallowed.
 - **MCP tools** act *outside* the sandbox (reading files in Docker, running
@@ -322,8 +373,9 @@ every tool runs via `docker exec` into it. The sandbox container never sees
 `/testbed`, so all repository access necessarily goes through the tools -
 exactly the boundary the subject describes.
 
-For MBPP, `run_tests(code, tests)` runs the candidate against the public tests
-in an isolated subprocess.
+For MBPP, `run_tests(code, test_list)` runs the candidate against the public
+tests in an isolated subprocess and returns a JSON string
+`{"success": bool, "output": str}`.
 
 ## Benchmark results
 

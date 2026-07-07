@@ -39,6 +39,9 @@ def main() -> None:
 if __name__ == "__main__":
     try:
         main()
+    except KeyboardInterrupt as e:
+        print(f"Interrupted: {e}" if str(e) else "Interrupted.")
+        sys.exit(130)
     except Exception as e:
         print(f"ERROR: {e}")
         sys.exit(1)

@@ -140,7 +140,11 @@ class MCPClientBridge:
 
         if self._loop is not None:
             if self._loop.is_running():
-                asyncio.run_coroutine_threadsafe(_close(), self._loop).result()
+                try:
+                    asyncio.run_coroutine_threadsafe(
+                        _close(), self._loop).result(timeout=10)
+                except Exception:
+                    pass
                 self._loop.call_soon_threadsafe(self._loop.stop)
             if self._thread is not None:
                 self._thread.join(timeout=1)

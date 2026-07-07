@@ -1,16 +1,23 @@
 """SWE-bench tool server.
 
-The repository to fix lives at /testbed inside a task-specific Docker
-container. This server owns that container and runs every tool inside it
-with `docker exec`, so file reads, edits and test runs happen there and
-not in the sandbox.
+Every tool acts on the testbed - the repository at /testbed - which lives
+in one of two places depending on configuration:
+  - a task-specific Docker container (the normal case): tools run inside
+    it with `docker exec`, so reads, edits and test runs happen there and
+    not in the sandbox;
+  - a plain local directory (TESTBED_PATH, standalone tool testing): tools
+    run directly on the host against that directory, no container at all.
 
-Configure the container with one of:
+Configure with one of:
   - SWEBENCH_TASK_FILE : a dumped task.json (image + eval script)
   - SWEBENCH_IMAGE     : a Docker image (overrides the task file image)
   - SWEBENCH_CONTAINER : an already-running container to reuse (not removed)
+  - TESTBED_PATH       : a local directory standing in for /testbed
 
 The container is started on the first tool call and removed at exit.
+
+Serves on stdio by default; `python mcp_tools_swebench.py http` serves the
+same tools over streamable HTTP instead (endpoint http://127.0.0.1:8000/mcp).
 """
 import atexit
 import json
@@ -19,6 +26,7 @@ import re
 import shlex
 import signal
 import subprocess
+import sys
 import uuid
 
 from mcp.server.fastmcp import FastMCP
@@ -32,13 +40,15 @@ EVAL_TIMEOUT = int(os.environ.get("SWEBENCH_EVAL_TIMEOUT", "400"))
 MAX_TEST_OUTPUT = 12000
 
 
-class SweContainer:
-    """The SWE-bench container the tools run inside."""
+class Testbed:
+    """The workspace the tools act on: the task's Docker container in the
+    normal case, or a plain local directory in TESTBED_PATH mode."""
 
     def __init__(self):
-        self.name = os.environ.get("SWEBENCH_CONTAINER") or None
-        self.owned = self.name is None
+        self.container_name = os.environ.get("SWEBENCH_CONTAINER") or None
+        self.owned = self.container_name is None
         self.image = os.environ.get("SWEBENCH_IMAGE", "")
+        self.local_path = os.environ.get("TESTBED_PATH", "")
         self.eval_script = ""
 
         task_file = os.environ.get("SWEBENCH_TASK_FILE")
@@ -48,20 +58,29 @@ class SweContainer:
             self.image = self.image or task.get("docker_image", "")
             self.eval_script = task.get("eval_script", "")
 
-    def ensure(self) -> str:
+    def local_root(self) -> str:
+        """The host directory standing in for WORKDIR, or "" when the tools
+        act on a real container. TESTBED_PATH points the tools at a plain
+        local directory (how exam_sandbox.sh tests them in isolation); a
+        configured container or image always takes precedence."""
+        if self.local_path and not (self.container_name or self.image):
+            return os.path.abspath(self.local_path)
+        return ""
+
+    def ensure_container(self) -> str:
         """Start the container on first use and return its name."""
-        if self.name:
-            return self.name
+        if self.container_name:
+            return self.container_name
         if not self.image:
             raise RuntimeError(
-                "No SWE-bench container configured. Set SWEBENCH_TASK_FILE, "
-                "SWEBENCH_IMAGE or SWEBENCH_CONTAINER.")
+                "No SWE-bench testbed configured. Set SWEBENCH_TASK_FILE, "
+                "SWEBENCH_IMAGE, SWEBENCH_CONTAINER, or TESTBED_PATH.")
         name = "agent_smith_swe_" + uuid.uuid4().hex[:12]
         subprocess.run(
             ["docker", "run", "-d", "--name", name, self.image,
              "tail", "-f", "/dev/null"],
             check=True, capture_output=True, text=True)
-        self.name = name
+        self.container_name = name
         self.owned = True
         subprocess.run(
             ["docker", "exec", name, "git", "config", "--global",
@@ -70,18 +89,38 @@ class SweContainer:
         return name
 
     def cleanup(self) -> None:
-        if self.name and self.owned:
-            subprocess.run(["docker", "rm", "-f", self.name],
+        if self.container_name and self.owned:
+            subprocess.run(["docker", "rm", "-f", self.container_name],
                            capture_output=True, text=True)
-            self.name = None
+            self.container_name = None
 
 
-CONTAINER = SweContainer()
+TESTBED = Testbed()
 
 
 def _exec(args, input_text=None, workdir=None, timeout=EXEC_TIMEOUT):
-    """Run a command in the container. Returns (exit_code, stdout, stderr)."""
-    container = CONTAINER.ensure()
+    """Run a command in the container. Returns (exit_code, stdout, stderr).
+
+    In TESTBED_PATH mode there is no container: the command runs directly on
+    the host, with WORKDIR mapped to the local directory in both the
+    arguments and the output (so paths keep the /testbed form the tools
+    document).
+    """
+    local_root = TESTBED.local_root()
+    if local_root:
+        args = [a.replace(WORKDIR, local_root) for a in args]
+        cwd = (workdir or WORKDIR).replace(WORKDIR, local_root)
+        try:
+            proc = subprocess.run(args, input=input_text, cwd=cwd,
+                                  capture_output=True, text=True,
+                                  errors="replace", timeout=timeout)
+        except subprocess.TimeoutExpired:
+            return 124, "", "Timed out after %ds." % timeout
+        return (proc.returncode,
+                proc.stdout.replace(local_root, WORKDIR),
+                proc.stderr.replace(local_root, WORKDIR))
+
+    container = TESTBED.ensure_container()
     cmd = ["docker", "exec"]
     if input_text is not None:
         cmd.append("-i")
@@ -229,11 +268,11 @@ def run_command(command: str, workdir: str = WORKDIR) -> str:
 @mcp.tool()
 def run_tests() -> str:
     """Run the evaluation script and report which tests pass or fail."""
-    if not CONTAINER.eval_script:
+    if not TESTBED.eval_script:
         return ("Error: no evaluation script configured (set "
                 "SWEBENCH_TASK_FILE). Use run_command to run tests manually.")
     rc, _, err = _exec(["sh", "-c", "cat > /tmp/eval.sh"],
-                       input_text=CONTAINER.eval_script)
+                       input_text=TESTBED.eval_script)
     if rc != 0:
         return "Error preparing eval script: %s" % err.strip()
     rc, out, err = _exec(["bash", "/tmp/eval.sh"], timeout=EVAL_TIMEOUT)
@@ -250,11 +289,11 @@ def run_tests() -> str:
 
 
 def _on_signal(signum, frame):
-    CONTAINER.cleanup()
+    TESTBED.cleanup()
     raise SystemExit(0)
 
 
-atexit.register(CONTAINER.cleanup)
+atexit.register(TESTBED.cleanup)
 for _sig in (getattr(signal, "SIGINT", None),
              getattr(signal, "SIGTERM", None)):
     if _sig is not None:
@@ -265,4 +304,11 @@ for _sig in (getattr(signal, "SIGINT", None),
 
 
 if __name__ == "__main__":
-    mcp.run()
+    args = sys.argv[1:]
+    if args == ["http"]:
+        mcp.run(transport="streamable-http")
+    elif not args:
+        mcp.run()
+    else:
+        print("usage: python mcp_tools_swebench.py [http]", file=sys.stderr)
+        sys.exit(2)

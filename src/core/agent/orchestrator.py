@@ -44,8 +44,8 @@ class BaseOrchestrator(ABC):
     def run(self, task_description: str) -> SolutionOutput:
         """Start the sandbox, run the loop, always clean up afterwards."""
         self.console.task_start(self.task_id, self.benchmark, self.model_name)
-        self.sandbox.start()
         try:
+            self.sandbox.start()
             return self._loop(task_description)
         finally:
             self.sandbox.cleanup()
@@ -107,7 +107,7 @@ class BaseOrchestrator(ABC):
                     steps.append(self._step(
                         i + 1, in_tokens, out_tokens, request_ms, retries,
                         llm_output, sandbox_input,
-                        f"final_answer called: {signal.answer}"))
+                        signal.output + f"final_answer called: {signal.answer}"))
                     solution = signal.answer
                     success = True
                     break
